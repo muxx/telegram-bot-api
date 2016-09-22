@@ -20,10 +20,13 @@ import (
 
 // BotAPI allows you to interact with the Telegram Bot API.
 type BotAPI struct {
-	Token  string       `json:"token"`
-	Debug  bool         `json:"debug"`
-	Self   User         `json:"-"`
-	Client *http.Client `json:"-"`
+	Token         string       `json:"token"`
+	Debug         bool         `json:"debug"`
+	Self          User         `json:"-"`
+	Client        *http.Client `json:"-"`
+	mux           *http.ServeMux
+	webhookURL    string
+	updateHandler UpdateHandler
 }
 
 // NewBotAPI creates a new BotAPI instance.
@@ -422,6 +425,43 @@ func (bot *BotAPI) SetWebhook(config WebhookConfig) (APIResponse, error) {
 	}
 
 	return apiResp, nil
+}
+
+// Handler returns the Messenger in HTTP client form.
+func (bot *BotAPI) Handler() http.Handler {
+	return bot.mux
+}
+
+// SetHandler set handler
+func (bot *BotAPI) SetHandler(mux *http.ServeMux) {
+	bot.mux = mux
+	bot.mux.HandleFunc(bot.webhookURL, bot.handleWebhook)
+}
+
+func (bot *BotAPI) handleWebhook(w http.ResponseWriter, r *http.Request) {
+	bytes, _ := ioutil.ReadAll(r.Body)
+
+	var update Update
+	json.Unmarshal(bytes, &update)
+
+	if bot.updateHandler != nil {
+		bot.updateHandler(update)
+	}
+}
+
+func (bot *BotAPI) HanleUpdates(f UpdateHandler) {
+	bot.updateHandler = f
+}
+
+func (bot *BotAPI) InitWebhook(host string, webhookURL string, mux *http.ServeMux) {
+	u, _ := url.Parse(host + webhookURL)
+	config := WebhookConfig{
+		URL: u,
+	}
+	bot.SetWebhook(config)
+	bot.webhookURL = webhookURL
+
+	bot.SetHandler(mux)
 }
 
 // GetUpdatesChan starts and returns a channel for getting updates.

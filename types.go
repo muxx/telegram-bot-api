@@ -28,6 +28,8 @@ type Update struct {
 	CallbackQuery      *CallbackQuery      `json:"callback_query"`
 }
 
+type UpdateHandler func(Update)
+
 // User is a user on Telegram.
 type User struct {
 	ID        int    `json:"id"`
